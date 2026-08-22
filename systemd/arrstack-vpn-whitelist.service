@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=oneshot
 # Adjust the subnet below if you changed ARRSTACK_SUBNET in .env
 ExecStart=/usr/bin/nordvpn whitelist add subnet 172.20.0.0/16
+ExecStart=/usr/bin/nordvpn whitelist add port 32400
 
 [Install]
 WantedBy=multi-user.target

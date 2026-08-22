@@ -64,12 +64,25 @@ needs one whitelisted subnet.
   Settings > Connect > add Plex (host = your LAN IP, not `localhost` —
   Plex isn't on this network — port `32400`, plus your Plex auth token).
   Enable "On Import" and "On Upgrade" so Plex refreshes automatically.
+- **Plex** (`http://localhost:32400/web`) — Plex runs on `network_mode: host`
+  (not the `arrstack` bridge network) since it needs LAN discovery and
+  remote access to work properly. First run: get a claim token from
+  https://plex.tv/claim (expires in ~4 minutes), paste it into `.env` as
+  `PLEX_CLAIM`, then `sudo docker compose up -d plex`. Once it shows up
+  linked to your account in the Plex web UI, you can clear `PLEX_CLAIM`
+  from `.env` — it's not needed on subsequent starts. Add your TV and
+  Movie libraries pointing at `/tv` and `/movies` inside the container.
+  For remote access, either forward port 32400 on your router to this
+  machine, or skip that entirely and use Tailscale.
 - **Seerr** (`http://localhost:5055`) — connect Plex first (Settings >
   Plex), then Settings > Services > add Radarr and Sonarr the same way
   (container name + port + API key), marking each as the default server.
 
 ## Known gotchas (learned the hard way)
 
+- **Each `docker-compose up` with no shared network creates its own
+  subnet.** That's why everything here uses one external `arrstack`
+  network — one NordVPN whitelist entry covers all of it, forever.
 - **NordVPN's whitelist can reset on reboot** if the daemon comes up
   fresh. The included `systemd/arrstack-vpn-whitelist.service` re-applies
   it on every boot — see below to install it.
@@ -77,9 +90,26 @@ needs one whitelisted subnet.
   ownership doesn't match `PUID`/`PGID` (e.g. after a container
   recreate). If you see a fresh temp password appear, run:
   `sudo chown -R ${PUID}:${PGID} $DATA_ROOT/qbittorrent/config`
+- **Folder names with spaces** (e.g. `Tv Shows`) must be quoted in
+  YAML volume mounts, or the mount silently fails/misparses.
+- **Sonarr/Radarr expect one series/movie root folder** with
+  `Season 01`, `Season 02`, etc. as subfolders — not a separate
+  top-level folder per season. The latter causes inconsistent
+  Library Import behavior.
 - **linuxserver.io images use `/config`; Seerr's image uses
   `/app/config`.** Check the error message / image docs before
   assuming the Sonarr/Radarr convention applies everywhere.
+- **Plex needs `network_mode: host`, not the `arrstack` bridge.**
+  Remote access and local network discovery don't work reliably behind
+  a Docker bridge network. Because of this, Sonarr/Radarr's Plex
+  Connect settings need your machine's real LAN IP (not `localhost`
+  or a container name) — same network-boundary reason.
+- **NordVPN's firewall blocks Plex the same way it blocked qBittorrent
+  and Sonarr** — since Plex is on host networking, it needs its own
+  **port** whitelist (`32400`), separate from the `arrstack` **subnet**
+  whitelist the other containers use. `setup.sh` and the systemd unit
+  both handle this, but it's easy to forget if you add Plex later by
+  hand.
 
 ## Installing the reboot-safe whitelist service (optional but recommended)
 

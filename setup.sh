@@ -17,6 +17,7 @@ mkdir -p "${DATA_ROOT}/prowlarr/config"
 mkdir -p "${DATA_ROOT}/sonarr/config"
 mkdir -p "${DATA_ROOT}/radarr/config"
 mkdir -p "${DATA_ROOT}/seerr/config"
+mkdir -p "${DATA_ROOT}/plex/config"
 mkdir -p "${DOWNLOADS_PATH}"
 mkdir -p "${TV_PATH}"
 mkdir -p "${MOVIES_PATH}"
@@ -31,12 +32,21 @@ fi
 if command -v nordvpn >/dev/null 2>&1; then
   echo "==> Whitelisting ${ARRSTACK_SUBNET} in NordVPN"
   nordvpn whitelist add subnet "${ARRSTACK_SUBNET}" || true
-  echo "    NOTE: this whitelist can be lost if the NordVPN daemon"
-  echo "    resets. If containers lose connectivity after a reboot,"
-  echo "    re-run: nordvpn whitelist add subnet ${ARRSTACK_SUBNET}"
+
+  echo "==> Whitelisting Plex port 32400 in NordVPN"
+  # Plex runs on host networking (not the arrstack bridge), so it needs
+  # its own port whitelist rather than the subnet rule above.
+  nordvpn whitelist add port 32400 || true
+
+  echo "    NOTE: whitelist rules can be lost if the NordVPN daemon"
+  echo "    resets. If containers or Plex lose connectivity after a"
+  echo "    reboot, re-run:"
+  echo "      nordvpn whitelist add subnet ${ARRSTACK_SUBNET}"
+  echo "      nordvpn whitelist add port 32400"
 else
   echo "==> nordvpn CLI not found — skipping whitelist step."
-  echo "    If you use NordVPN's Linux firewall, whitelist ${ARRSTACK_SUBNET} manually."
+  echo "    If you use NordVPN's Linux firewall, whitelist ${ARRSTACK_SUBNET}"
+  echo "    (subnet) and 32400 (port) manually."
 fi
 
 if [ -z "${WIREGUARD_PRIVATE_KEY:-}" ]; then

@@ -111,6 +111,27 @@ services:
     networks:
       - arrstack
 
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    # host networking: required for Plex remote access, LAN discovery,
+    # and DLNA — do NOT put this on the arrstack bridge network.
+    network_mode: host
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/Toronto}
+      - VERSION=docker
+      # Optional: only needed the first time you link a fresh server to
+      # your Plex account. Get a fresh one from https://plex.tv/claim
+      # (valid for ~4 minutes) — leave blank on subsequent starts.
+      - PLEX_CLAIM=${PLEX_CLAIM:-}
+    volumes:
+      - ${DATA_ROOT}/plex/config:/config
+      - ${TV_PATH}:/tv
+      - ${MOVIES_PATH}:/movies
+    restart: unless-stopped
+
 networks:
   arrstack:
     external: true
