@@ -110,13 +110,30 @@ needs one whitelisted subnet.
   whitelist the other containers use. `setup.sh` and the systemd unit
   both handle this, but it's easy to forget if you add Plex later by
   hand.
+- **NordVPN's `LAN Discovery` setting blocks other devices on your
+  network from reaching this machine at all**, independent of the
+  firewall/whitelist. If a device on the same subnet gets "server
+  unreachable" while `curl` from the server itself works fine, check
+  `nordvpn settings | grep -i lan` — it needs to say `enabled`.
+  `nordvpn set lan-discovery enabled`.
+- **Some NordVPN settings changes don't reliably apply live** — if a
+  `nordvpn set ...` command reports success but behavior doesn't
+  actually change, a full reboot has fixed it every time this has come
+  up. The `arrstack-vpn-settings.service` systemd unit re-applies the
+  important ones on every boot so you don't have to chase this by hand.
 
-## Installing the reboot-safe whitelist service (optional but recommended)
+## Installing the reboot-safe NordVPN settings service (optional but recommended)
+
+NordVPN has been observed to silently reset a few settings on reboot —
+the `arrstack` subnet/port whitelist, `lan-discovery`, and `firewall`
+state have all reverted unexpectedly at least once each in practice,
+breaking LAN access to Plex or the Docker services until re-applied by
+hand. This unit re-applies all of them automatically on every boot:
 
 ```
-sudo cp systemd/arrstack-vpn-whitelist.service /etc/systemd/system/
+sudo cp systemd/arrstack-vpn-settings.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now arrstack-vpn-whitelist.service
+sudo systemctl enable --now arrstack-vpn-settings.service
 ```
 
 ## Updating

@@ -1,0 +1,17 @@
+[Unit]
+Description=Re-apply NordVPN network settings (whitelist, LAN discovery, firewall) for arrstack + Plex
+After=network-online.target nordvpnd.service docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Adjust the subnet below if you changed ARRSTACK_SUBNET in .env
+ExecStart=/usr/bin/nordvpn whitelist add subnet 172.20.0.0/16
+ExecStart=/usr/bin/nordvpn whitelist add port 32400
+# These have been observed to silently reset/not persist correctly
+# across reboots, which broke LAN access to Plex and Docker services.
+ExecStart=/usr/bin/nordvpn set lan-discovery enabled
+ExecStart=/usr/bin/nordvpn set firewall enabled
+
+[Install]
+WantedBy=multi-user.target
