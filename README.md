@@ -80,9 +80,6 @@ needs one whitelisted subnet.
 
 ## Known gotchas (learned the hard way)
 
-- **Each `docker-compose up` with no shared network creates its own
-  subnet.** That's why everything here uses one external `arrstack`
-  network — one NordVPN whitelist entry covers all of it, forever.
 - **NordVPN's whitelist can reset on reboot** if the daemon comes up
   fresh. The included `systemd/arrstack-vpn-whitelist.service` re-applies
   it on every boot — see below to install it.
@@ -92,10 +89,6 @@ needs one whitelisted subnet.
   `sudo chown -R ${PUID}:${PGID} $DATA_ROOT/qbittorrent/config`
 - **Folder names with spaces** (e.g. `Tv Shows`) must be quoted in
   YAML volume mounts, or the mount silently fails/misparses.
-- **Sonarr/Radarr expect one series/movie root folder** with
-  `Season 01`, `Season 02`, etc. as subfolders — not a separate
-  top-level folder per season. The latter causes inconsistent
-  Library Import behavior.
 - **linuxserver.io images use `/config`; Seerr's image uses
   `/app/config`.** Check the error message / image docs before
   assuming the Sonarr/Radarr convention applies everywhere.
