@@ -1,0 +1,17 @@
+# Header widgets — the strip across the top of the dashboard.
+
+- resources:
+    cpu: true
+    memory: true
+    # Path INSIDE the homepage container. /app/config is the bind mount of
+    # ${DATA_ROOT}, so this reports the filesystem holding it — which with
+    # the default layout is also the one holding TV_PATH and MOVIES_PATH,
+    # i.e. this is your media disk.
+    #
+    # That stops being true the moment you move the library to its own
+    # drive. Then mount that drive into homepage read-only and point here.
+    disk: /app/config
+
+- search:
+    provider: duckduckgo
+    target: _blank

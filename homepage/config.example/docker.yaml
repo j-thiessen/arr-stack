@@ -1,0 +1,13 @@
+# Docker API access, used for the up/down badge on each tile.
+#
+# This points at the socket proxy, never at /var/run/docker.sock directly.
+# The socket is root-equivalent on the host; homepage is the one container
+# in this stack that faces the LAN. The proxy is what keeps those apart —
+# it permits GET /containers and nothing else.
+#
+# The name `arrstack` here is what tiles reference as `server: arrstack`
+# in services.yaml.
+
+arrstack:
+  host: dockerproxy
+  port: 2375

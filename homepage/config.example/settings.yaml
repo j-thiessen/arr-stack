@@ -1,0 +1,24 @@
+title: Arr Stack
+description: Media stack status
+
+# Group order on the page. Must match the group names in services.yaml.
+layout:
+  Media:
+    style: row
+    columns: 2
+  Automation:
+    style: row
+    columns: 3
+  Downloads:
+    style: row
+    columns: 2
+
+headerStyle: boxed
+theme: dark
+color: slate
+
+# Show the tile's status badge (running / stopped) from the Docker proxy.
+showStats: true
+
+# Hide the version footer — it's noise on a single-purpose dashboard.
+hideVersion: true

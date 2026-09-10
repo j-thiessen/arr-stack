@@ -150,6 +150,57 @@ services:
       - ${MOVIES_PATH}:/movies
     restart: unless-stopped
 
+  dockerproxy:
+    image: ghcr.io/tecnativa/docker-socket-proxy:${DOCKERPROXY_TAG:-latest}
+    container_name: dockerproxy
+    # A read-only window onto the Docker API, so the dashboard can show
+    # container state without touching the socket itself. /var/run/docker.sock
+    # is root-equivalent on the host, and homepage is the one container here
+    # that faces the LAN — this keeps those two facts apart.
+    environment:
+      - CONTAINERS=1   # GET /containers — the only thing homepage needs
+      - POST=0         # no write operations
+      # every other endpoint defaults to denied
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Deliberately no `ports:` — reachable only from the arrstack network.
+    restart: unless-stopped
+    networks:
+      - arrstack
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:${HOMEPAGE_TAG:-latest}
+    container_name: homepage
+    depends_on:
+      - dockerproxy
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/Toronto}
+      # Required since homepage v0.9. Requests whose Host header isn't listed
+      # are rejected, and it surfaces as a blank page rather than an error.
+      # List every host:port you actually type; on :80 that's a bare host.
+      - HOMEPAGE_ALLOWED_HOSTS=${HOMEPAGE_ALLOWED_HOSTS:-localhost}
+      # Referenced from the config YAML as {{HOMEPAGE_VAR_*}}, so the dashboard
+      # definition can live in git while the secrets stay in .env.
+      - HOMEPAGE_VAR_LAN_IP=${LAN_IP:-localhost}
+      - HOMEPAGE_VAR_SONARR_KEY=${SONARR_API_KEY:-}
+      - HOMEPAGE_VAR_RADARR_KEY=${RADARR_API_KEY:-}
+      - HOMEPAGE_VAR_PROWLARR_KEY=${PROWLARR_API_KEY:-}
+      - HOMEPAGE_VAR_SEERR_KEY=${SEERR_API_KEY:-}
+      - HOMEPAGE_VAR_PLEX_TOKEN=${PLEX_TOKEN:-}
+      - HOMEPAGE_VAR_QBT_USER=${QBT_USERNAME:-}
+      - HOMEPAGE_VAR_QBT_PASS=${QBT_PASSWORD:-}
+    volumes:
+      - ${DATA_ROOT}/homepage/config:/app/config
+    ports:
+      # homepage listens on 3000 internally. Parameterised so a conflict on
+      # :80 is a one-line change in .env rather than an edit here.
+      - "${HOMEPAGE_PORT:-80}:3000"
+    restart: unless-stopped
+    networks:
+      - arrstack
+
 networks:
   arrstack:
     external: true

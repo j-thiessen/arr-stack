@@ -1,0 +1,10 @@
+# Static links. Not status — just the pages you end up needing anyway.
+# Homepage requires this file to exist; an empty list is fine.
+
+- Admin:
+    - Plex claim:
+        - abbr: PLX
+          href: https://plex.tv/claim
+    - NordVPN account:
+        - abbr: VPN
+          href: https://my.nordaccount.com/

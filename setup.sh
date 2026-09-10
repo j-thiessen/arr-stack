@@ -94,9 +94,25 @@ ensure_owner() {
 }
 
 echo "==> Creating data directories under ${DATA_ROOT}"
-for svc in qbittorrent prowlarr sonarr radarr seerr plex; do
+for svc in qbittorrent prowlarr sonarr radarr seerr plex homepage; do
   mkdir -p "${DATA_ROOT}/${svc}/config"
 done
+
+# Seed the dashboard config from the examples in this repo. Per-file, and
+# only when absent — re-running never clobbers edits you've made, and the
+# repo keeps a clean copy to diff against.
+if [ -d homepage/config.example ]; then
+  echo "==> Seeding homepage config (existing files left alone)"
+  for f in homepage/config.example/*.yaml; do
+    target="${DATA_ROOT}/homepage/config/$(basename "$f")"
+    if [ -e "$target" ]; then
+      echo "    kept    $(basename "$f")"
+    else
+      cp "$f" "$target"
+      echo "    seeded  $(basename "$f")"
+    fi
+  done
+fi
 
 # Only touch ownership on media dirs we create ourselves — never recursively
 # rewrite an existing library.

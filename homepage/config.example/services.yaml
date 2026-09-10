@@ -1,0 +1,106 @@
+# Dashboard tiles.
+#
+# READ THIS BEFORE EDITING — every tile carries two URLs for the same
+# service, and they are NOT interchangeable:
+#
+#   href        where your BROWSER goes when you click the tile.
+#               Must be the host's LAN IP. Container names mean nothing
+#               to your laptop.
+#
+#   widget.url  where the HOMEPAGE CONTAINER fetches stats from.
+#               Must be the container name on the arrstack bridge.
+#
+# Swap them and you get a dashboard where the links work but every widget
+# is blank, or the reverse. Two services bend the rule further — see the
+# comments on qBittorrent and Plex below.
+#
+# {{HOMEPAGE_VAR_*}} values come from the homepage service's environment
+# in docker-compose.yml, which reads them from .env. A blank key just
+# leaves that one widget empty; the rest of the dashboard still loads.
+
+- Media:
+    - Plex:
+        icon: plex.png
+        # Plex is network_mode: host, so it is NOT on the arrstack bridge —
+        # `plex:32400` will not resolve. LAN IP for both URLs, unlike
+        # every other tile here.
+        href: http://{{HOMEPAGE_VAR_LAN_IP}}:32400/web
+        description: Media server
+        server: arrstack
+        container: plex
+        widget:
+          type: plex
+          url: http://{{HOMEPAGE_VAR_LAN_IP}}:32400
+          key: "{{HOMEPAGE_VAR_PLEX_TOKEN}}"
+    - Seerr:
+        icon: overseerr.png
+        href: http://{{HOMEPAGE_VAR_LAN_IP}}:5055
+        description: Requests
+        server: arrstack
+        container: seerr
+        widget:
+          type: overseerr
+          url: http://seerr:5055
+          key: "{{HOMEPAGE_VAR_SEERR_KEY}}"
+- Automation:
+    - Sonarr:
+        icon: sonarr.png
+        href: http://{{HOMEPAGE_VAR_LAN_IP}}:8989
+        description: TV
+        server: arrstack
+        container: sonarr
+        widget:
+          type: sonarr
+          url: http://sonarr:8989
+          key: "{{HOMEPAGE_VAR_SONARR_KEY}}"
+    - Radarr:
+        icon: radarr.png
+        href: http://{{HOMEPAGE_VAR_LAN_IP}}:7878
+        description: Movies
+        server: arrstack
+        container: radarr
+        widget:
+          type: radarr
+          url: http://radarr:7878
+          key: "{{HOMEPAGE_VAR_RADARR_KEY}}"
+    - Prowlarr:
+        icon: prowlarr.png
+        href: http://{{HOMEPAGE_VAR_LAN_IP}}:9696
+        description: Indexers
+        server: arrstack
+        container: prowlarr
+        widget:
+          type: prowlarr
+          url: http://prowlarr:9696
+          key: "{{HOMEPAGE_VAR_PROWLARR_KEY}}"
+- Downloads:
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: http://{{HOMEPAGE_VAR_LAN_IP}}:8080
+        description: Torrents
+        server: arrstack
+        container: qbittorrent
+        widget:
+          type: qbittorrent
+          # `gluetun`, NOT `qbittorrent` — qBittorrent has no network stack
+          # of its own, gluetun owns the namespace. Same address Sonarr and
+          # Radarr use for their download client.
+          #
+          # If this widget stays empty with everything else working, it's
+          # qBittorrent's host-header validation rejecting `Host: gluetun:8080`.
+          # Add `gluetun` under Tools > Options > Web UI > Server domains.
+          url: http://gluetun:8080
+          username: "{{HOMEPAGE_VAR_QBT_USER}}"
+          password: "{{HOMEPAGE_VAR_QBT_PASS}}"
+    - VPN:
+        icon: gluetun.png
+        # No href — there's no web UI to open, this tile is status only.
+        description: NordVPN tunnel
+        server: arrstack
+        container: gluetun
+        widget:
+          type: gluetun
+          # gluetun's HTTP control server. This is what puts the tunnel's
+          # current public IP on the dashboard — if it shows your home IP,
+          # the kill switch is not doing its job.
+          url: http://gluetun:8000

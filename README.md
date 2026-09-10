@@ -87,6 +87,42 @@ needs one allowlisted subnet.
   Plex), then Settings > Services > add Radarr and Sonarr the same way
   (container name + port + API key), marking each as the default server.
 
+## Dashboard
+
+[Homepage](https://gethomepage.dev) runs on port 80, so `http://<lan-ip>/`
+is one place to see whether everything is actually working — including the
+**tunnel's current public IP**, which turns the kill-switch check into
+something you glance at instead of a `docker exec`.
+
+Two things to set in `.env` before it's useful:
+
+- `LAN_IP` — this machine's address on your network. Tile links point here.
+- `HOMEPAGE_ALLOWED_HOSTS` — must contain every `host:port` you'll type in
+  the browser. On port 80 that's a bare host, e.g. `localhost,192.168.1.50`.
+
+Then the widget API keys, which you can fill in one at a time — a blank key
+leaves that one widget empty and the rest of the dashboard still loads:
+
+| Service | Where to get the key |
+| --- | --- |
+| Sonarr / Radarr / Prowlarr | Settings > General > Security > API Key |
+| Seerr | Settings > General > API Key |
+| Plex | [X-Plex-Token](https://support.plex.tv/articles/204059436) |
+| qBittorrent | Your WebUI username/password |
+
+`setup.sh` seeds `${DATA_ROOT}/homepage/config` from
+`homepage/config.example/` on first run, per file and only when absent — so
+re-running it never overwrites your edits, and the repo keeps a clean copy
+to diff against. Edit the live files under `${DATA_ROOT}`; the dashboard
+picks up changes without a restart.
+
+**Container up/down badges come via a socket proxy, not the raw socket.**
+`/var/run/docker.sock` is root-equivalent on the host, and homepage is the
+one container here that faces the LAN. The `dockerproxy` service sits
+between them and permits `GET /containers` only. Mounting the socket
+straight into homepage would work and is a common shortcut — it also means
+anything that can reach port 80 can effectively root the box.
+
 ## Known gotchas (learned the hard way)
 
 - **NordVPN's allowlist can reset on reboot** if the daemon comes up
@@ -119,6 +155,26 @@ needs one allowlisted subnet.
   (`network_mode: "service:gluetun"`), so it stays attached to a
   namespace that no longer exists:
   `docker compose up -d --force-recreate qbittorrent`
+- **`HOMEPAGE_ALLOWED_HOSTS` is mandatory** (homepage v0.9+). Any request
+  whose `Host` header isn't listed is rejected, and it surfaces as a blank
+  page rather than a useful error — so a dashboard that works on
+  `localhost` and is blank from your laptop is almost always this. List
+  every `host:port` you actually type; on port 80 that's a bare host.
+- **The qBittorrent widget hits the host-header gotcha too.** It calls
+  `http://gluetun:8080`, so the `Host` header is `gluetun:8080` and
+  qBittorrent 4.6+ rejects it — the same validation described above, just
+  arriving through the API instead of a browser. Symptom is one empty
+  widget while every other tile works. Add `gluetun` to Server domains.
+- **Dashboard tiles carry two URLs and they are not interchangeable.**
+  `href` is where your *browser* goes, so it must be the LAN IP; container
+  names mean nothing to your laptop. `widget.url` is where the *homepage
+  container* fetches stats, so it must be the container name on the
+  `arrstack` bridge. Get them backwards and the links work while every
+  widget is blank, or vice versa. Two exceptions, both for reasons already
+  listed above: qBittorrent's widget uses `gluetun:8080`, and Plex uses the
+  LAN IP for *both* because host networking keeps it off the bridge.
+- **Port 80 may already be taken.** `HOMEPAGE_PORT` in `.env` exists for
+  that. Check with `sudo ss -lntp | grep ':80 '`.
 - **linuxserver.io images use `/config`; Seerr's image uses
   `/app/config`.** Check the error message / image docs before
   assuming the Sonarr/Radarr convention applies everywhere.
@@ -253,6 +309,25 @@ The repo is ahead of the running machine — these close the gap.
       pass; and a real reboot leaves Plex and the *arr UIs reachable on the LAN
       with no manual `nordvpn` commands.
 
+### Dashboard first run
+
+- [ ] **Confirm port 80 is free** before first start:
+      `sudo ss -lntp | grep ':80 '`. If it isn't, set `HOMEPAGE_PORT`.
+- [ ] **Set `LAN_IP` and `HOMEPAGE_ALLOWED_HOSTS`** in `.env`. Both default
+      to placeholder values that will not work on your network.
+- [ ] **Collect the five API keys** (see the Dashboard section). Fill them
+      in as you go — a blank key only empties that one widget.
+- [ ] **Add `gluetun` to qBittorrent's Server domains** so its widget can
+      authenticate. Tools > Options > Web UI.
+- [ ] **Load the dashboard from another machine**, not just localhost —
+      that's the only thing that actually exercises
+      `HOMEPAGE_ALLOWED_HOSTS`.
+- [ ] **Check nothing new is needed in the NordVPN allowlist.** Homepage is
+      bridge-networked with a published port, so the existing `arrstack`
+      subnet rule should already cover it — unlike Plex, which needed its
+      own port rule precisely because it's host-networked. Confirm by
+      loading the page from another LAN machine.
+
 ### Verify (claims not checked from a dev machine)
 
 One command each. Each has a real failure mode behind it.
@@ -267,6 +342,16 @@ One command each. Each has a real failure mode behind it.
 - [ ] **Which of `allowlist` / `whitelist` this NordVPN CLI has.** The script
       detects it at runtime, so this is confirmation rather than a fix.
       `nordvpn allowlist --help || nordvpn whitelist --help`
+- [ ] **`{{HOMEPAGE_VAR_*}}` substitution works in the tag you pull.** If it
+      doesn't, the keys have to be written into `services.yaml` directly —
+      at which point that file holds secrets and must stop being tracked.
+      Symptom: widgets fail auth and the literal `{{...}}` shows in logs.
+- [ ] **gluetun's control server answers on the bridge.** This is what
+      feeds the VPN public-IP tile; gluetun's own firewall may not accept
+      inbound from the docker network.
+      `docker exec homepage wget -qO- http://gluetun:8000/v1/publicip/ip`
+- [ ] **Homepage honours `PUID`/`PGID`.** If not, the config bind mount
+      needs different ownership than `setup.sh` gives it.
 
 ### Deferred — considered and consciously not done
 
