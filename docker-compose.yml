@@ -1,30 +1,43 @@
-version: "3"
-
 # ─────────────────────────────────────────────────────────────
 # Arr Stack: Prowlarr + Sonarr + Radarr + qBittorrent (behind
 # Gluetun/NordVPN kill switch) + Seerr (Overseerr-compatible)
 #
 # All services share one Docker network (arrstack) so NordVPN's
-# host firewall only needs ONE subnet whitelisted, ever.
+# host firewall only needs ONE subnet allowlisted, ever.
 # See README.md for first-time setup steps.
+#
+# Image tags default to :latest but are overridable per service in
+# .env (SONARR_TAG=4.0.15 etc). Pin them to what you're already
+# running — `docker compose images` — so an update is a deliberate
+# bump with a known-good value to roll back to.
 # ─────────────────────────────────────────────────────────────
 
 services:
   gluetun:
-    image: qmcgaw/gluetun
+    image: qmcgaw/gluetun:${GLUETUN_TAG:-latest}
     container_name: gluetun
     cap_add:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
     environment:
+      - TZ=${TZ:-America/Toronto}
       - VPN_SERVICE_PROVIDER=nordvpn
       - VPN_TYPE=wireguard
       - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
       - SERVER_COUNTRIES=${VPN_SERVER_COUNTRY:-Canada}
-      - FIREWALL_OUTBOUND_SUBNETS=${ARRSTACK_SUBNET:-172.20.0.0/16}
+      # Comma-separated. The arrstack subnet lets Sonarr/Radarr reach
+      # qBittorrent's WebUI; add your LAN subnet (LAN_SUBNET) if you ever set
+      # userland-proxy=false in daemon.json, which stops Docker rewriting the
+      # source IP to the bridge gateway and would otherwise drop LAN clients.
+      - FIREWALL_OUTBOUND_SUBNETS=${ARRSTACK_SUBNET:-172.20.0.0/16}${LAN_SUBNET:+,${LAN_SUBNET}}
+      # Refresh the bundled NordVPN server list; a stale one shows up much
+      # later as a confusing "no server found".
+      - UPDATER_PERIOD=24h
     ports:
       - "8080:8080"   # qBittorrent WebUI (proxied through gluetun)
+      # Published, but NordVPN via gluetun does no port forwarding, so these
+      # do not get you inbound peer connections. See README.
       - "6881:6881"
       - "6881:6881/udp"
     restart: unless-stopped
@@ -32,11 +45,16 @@ services:
       - arrstack
 
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
+    image: lscr.io/linuxserver/qbittorrent:${QBITTORRENT_TAG:-latest}
     container_name: qbittorrent
     network_mode: "service:gluetun"   # no network of its own — dies with the tunnel
+    # Wait for the tunnel to be up, not merely for the container to exist.
+    # NOTE: qBittorrent borrows gluetun's network namespace, so recreating
+    # gluetun leaves this attached to a dead one:
+    #   docker compose up -d --force-recreate qbittorrent
     depends_on:
-      - gluetun
+      gluetun:
+        condition: service_healthy
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
@@ -48,7 +66,7 @@ services:
     restart: unless-stopped
 
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:latest
+    image: lscr.io/linuxserver/prowlarr:${PROWLARR_TAG:-latest}
     container_name: prowlarr
     environment:
       - PUID=${PUID:-1000}
@@ -63,7 +81,7 @@ services:
       - arrstack
 
   sonarr:
-    image: lscr.io/linuxserver/sonarr:latest
+    image: lscr.io/linuxserver/sonarr:${SONARR_TAG:-latest}
     container_name: sonarr
     environment:
       - PUID=${PUID:-1000}
@@ -80,7 +98,7 @@ services:
       - arrstack
 
   radarr:
-    image: lscr.io/linuxserver/radarr:latest
+    image: lscr.io/linuxserver/radarr:${RADARR_TAG:-latest}
     container_name: radarr
     environment:
       - PUID=${PUID:-1000}
@@ -97,7 +115,7 @@ services:
       - arrstack
 
   seerr:
-    image: ghcr.io/seerr-team/seerr:latest
+    image: ghcr.io/seerr-team/seerr:${SEERR_TAG:-latest}
     container_name: seerr
     environment:
       - PUID=${PUID:-1000}
@@ -112,7 +130,7 @@ services:
       - arrstack
 
   plex:
-    image: lscr.io/linuxserver/plex:latest
+    image: lscr.io/linuxserver/plex:${PLEX_TAG:-latest}
     container_name: plex
     # host networking: required for Plex remote access, LAN discovery,
     # and DLNA — do NOT put this on the arrstack bridge network.

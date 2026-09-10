@@ -1,17 +1,22 @@
 [Unit]
-Description=Re-apply NordVPN network settings (whitelist, LAN discovery, firewall) for arrstack + Plex
+Description=Re-apply NordVPN network settings (allowlist, LAN discovery, firewall) for arrstack + Plex
 After=network-online.target nordvpnd.service docker.service
-Wants=network-online.target
+# Wants=, not just After=: After= only orders the unit, it does not pull
+# nordvpnd into the boot transaction.
+Wants=network-online.target nordvpnd.service
 
 [Service]
 Type=oneshot
-# Adjust the subnet below if you changed ARRSTACK_SUBNET in .env
-ExecStart=/usr/bin/nordvpn whitelist add subnet 172.20.0.0/16
-ExecStart=/usr/bin/nordvpn whitelist add port 32400
-# These have been observed to silently reset/not persist correctly
-# across reboots, which broke LAN access to Plex and Docker services.
-ExecStart=/usr/bin/nordvpn set lan-discovery enabled
-ExecStart=/usr/bin/nordvpn set firewall enabled
+RemainAfterExit=yes
+# Subnet lives here so it stays in sync with .env — setup.sh writes it.
+# The leading '-' makes the file optional; the script defaults to
+# 172.20.0.0/16 when it is absent.
+EnvironmentFile=-/etc/default/arrstack
+ExecStart=/usr/local/bin/arrstack-vpn-apply.sh
+# The script only fails when nordvpnd never became reachable, which is worth
+# retrying; already-applied rules are not failures.
+Restart=on-failure
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
